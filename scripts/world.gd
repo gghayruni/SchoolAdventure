@@ -26,8 +26,11 @@ func _ready() -> void:
     _create_hud()
 
 func _unhandled_key_input(event: InputEvent) -> void:
-    if event.pressed and not event.echo and event.keycode == KEY_N:
-        get_tree().reload_current_scene()
+    # Godot passes all kinds of InputEvent here. Inspect keyboard-only
+    # properties after narrowing to InputEventKey.
+    if event is InputEventKey:
+        if event.pressed and not event.echo and event.keycode == KEY_N:
+            get_tree().reload_current_scene()
 
 func _mat(color: Color) -> StandardMaterial3D:
     var key := color.to_html(true)

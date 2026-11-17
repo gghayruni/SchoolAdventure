@@ -1,0 +1,24 @@
+; School Adventure: first playable 3D prototype.
+; Generated with Godot 4.x. No third-party assets are required.
+config_version=5
+
+[application]
+config/name="Дорога в школу — пробная прогулка"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+
+[physics]
+3d/default_gravity=18.0
+
+[gui]
+theme/default_font_size=16

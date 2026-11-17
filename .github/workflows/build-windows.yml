@@ -1,5 +1,5 @@
 
-name: Build School Adventure for Windows
+name: SchoolAdventure - Windows build
 
 on:
   workflow_dispatch:
@@ -10,77 +10,62 @@ permissions:
   contents: read
 
 jobs:
-  export_windows:
-    name: Windows game (Godot 4.7.2)
+  windows:
     runs-on: windows-2022
-    timeout-minutes: 35
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout game source
+      - name: Download project
         uses: actions/checkout@v4
 
-      - name: Download Godot editor
+      - name: Download Godot 4.7.2
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $url = 'https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip'
-          $zip = "$env:RUNNER_TEMP\godot-editor.zip"
-          curl.exe --fail --location --retry 3 --output $zip $url
-          if ($LASTEXITCODE -ne 0) { throw 'Godot download failed' }
-          Expand-Archive -LiteralPath $zip -DestinationPath "$env:RUNNER_TEMP\godot-editor" -Force
+          curl.exe --fail --location --retry 3 --output godot.zip $url
+          if ($LASTEXITCODE -ne 0) { throw 'Download failed' }
+          Expand-Archive -Path godot.zip -DestinationPath godot-download -Force
+          $console = Get-ChildItem godot-download -Recurse -Filter '*_console.exe' | Select-Object -First 1
+          if (-not $console) { throw 'Godot console executable not found' }
+          $normal = $console.FullName -replace '_console.exe$', '.exe'
+          if (-not (Test-Path $normal)) { throw 'Godot GUI executable not found' }
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          Copy-Item $console.FullName tools/
+          Copy-Item $normal tools/
 
-          $exe = Get-ChildItem "$env:RUNNER_TEMP\godot-editor" -Recurse -Filter '*.exe' |
-            Where-Object { $_.Name -notlike '*console*' } |
-            Select-Object -First 1
-
-          if (-not $exe) { throw 'Godot executable not found' }
-          "GODOT_EXE=$($exe.FullName)" |
-            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-
-      - name: Install Windows export templates
+      - name: Download Windows export templates
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $url = 'https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz'
-          $archive = "$env:RUNNER_TEMP\godot-templates.tpz"
-
-          curl.exe --fail --location --retry 3 --output $archive $url
+          curl.exe --fail --location --retry 3 --output templates.tpz $url
           if ($LASTEXITCODE -ne 0) { throw 'Templates download failed' }
+          New-Item -ItemType Directory -Force -Path unpack | Out-Null
+          tar.exe -xf templates.tpz -C unpack templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Templates extraction failed' }
+          $folder = Join-Path $env:APPDATA 'Godot/export_templates/4.7.2.stable'
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+          Copy-Item unpack/templates/windows_release_x86_64.exe $folder -Force
+          Copy-Item unpack/templates/windows_debug_x86_64.exe $folder -Force
 
-          $unpack = "$env:RUNNER_TEMP\godot-unpack"
-          New-Item -ItemType Directory -Force -Path $unpack | Out-Null
-
-          tar.exe -xf $archive -C $unpack templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe
-          if ($LASTEXITCODE -ne 0) { throw 'Template extraction failed' }
-
-          $dst = "$env:APPDATA\Godot\export_templates\4.7.2.stable"
-          New-Item -ItemType Directory -Force -Path $dst | Out-Null
-
-          Copy-Item "$unpack\templates\windows_release_x86_64.exe" "$dst\windows_release_x86_64.exe" -Force
-          Copy-Item "$unpack\templates\windows_debug_x86_64.exe" "$dst\windows_debug_x86_64.exe" -Force
-
-      - name: Import and validate project
-        shell: pwsh
+      - name: Import and check project
+        shell: cmd
         run: |
-          & "$env:GODOT_EXE" --headless --path . --import
-          if ($LASTEXITCODE -ne 0) { throw 'Project import failed' }
+          tools\Godot_v4.7.2-stable_win64_console.exe --headless --path . --import
+          if errorlevel 1 exit /b 1
 
-      - name: Export Windows game
-        shell: pwsh
+      - name: Build Windows game
+        shell: cmd
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          mkdir dist
+          tools\Godot_v4.7.2-stable_win64_console.exe --headless --path . --export-release "Windows Desktop" "dist\SchoolAdventure.exe"
+          if errorlevel 1 exit /b 1
+          if not exist "dist\SchoolAdventure.exe" exit /b 1
 
-          & $env:GODOT_EXE --headless --path . --export-release 'Windows Desktop' 'dist/SchoolAdventure.exe'
-
-          if ($LASTEXITCODE -ne 0) { throw 'Game export failed' }
-          if (!(Test-Path 'dist/SchoolAdventure.exe')) {
-            throw 'Game executable not found'
-          }
-
-      - name: Upload Windows game
+      - name: Upload EXE
         uses: actions/upload-artifact@v4
         with:
-          name: SchoolAdventure-Windows-Prototype
+          name: SchoolAdventure-Windows
           path: dist/
           if-no-files-found: error
-          retention-days: 30

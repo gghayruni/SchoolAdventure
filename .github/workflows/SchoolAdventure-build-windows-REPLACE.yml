@@ -1,0 +1,70 @@
+name: SchoolAdventure - Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Download project
+        uses: actions/checkout@v4
+
+      - name: Download Godot 4.7.2
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_win64.exe.zip'
+          curl.exe --fail --location --retry 3 --output godot.zip $url
+          if ($LASTEXITCODE -ne 0) { throw 'Download failed' }
+          Expand-Archive -Path godot.zip -DestinationPath godot-download -Force
+          $console = Get-ChildItem godot-download -Recurse -Filter '*_console.exe' | Select-Object -First 1
+          if (-not $console) { throw 'Godot console executable not found' }
+          $normal = $console.FullName -replace '_console.exe$', '.exe'
+          if (-not (Test-Path $normal)) { throw 'Godot GUI executable not found' }
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          Copy-Item $console.FullName tools/
+          Copy-Item $normal tools/
+
+      - name: Download Windows export templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz'
+          curl.exe --fail --location --retry 3 --output templates.tpz $url
+          if ($LASTEXITCODE -ne 0) { throw 'Templates download failed' }
+          New-Item -ItemType Directory -Force -Path unpack | Out-Null
+          tar.exe -xf templates.tpz -C unpack templates/windows_release_x86_64.exe templates/windows_debug_x86_64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Templates extraction failed' }
+          $folder = Join-Path $env:APPDATA 'Godot/export_templates/4.7.2.stable'
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+          Copy-Item unpack/templates/windows_release_x86_64.exe $folder -Force
+          Copy-Item unpack/templates/windows_debug_x86_64.exe $folder -Force
+
+      - name: Import and check project
+        shell: cmd
+        run: |
+          tools\Godot_v4.7.2-stable_win64_console.exe --headless --path . --import
+          if errorlevel 1 exit /b 1
+
+      - name: Build Windows game
+        shell: cmd
+        run: |
+          mkdir dist
+          tools\Godot_v4.7.2-stable_win64_console.exe --headless --path . --export-release "Windows Desktop" "dist\SchoolAdventure.exe"
+          if errorlevel 1 exit /b 1
+          if not exist "dist\SchoolAdventure.exe" exit /b 1
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: SchoolAdventure-Windows
+          path: dist/
+          if-no-files-found: error

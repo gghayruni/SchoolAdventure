@@ -62,7 +62,7 @@ jobs:
       - name: Import and validate project
         shell: pwsh
         run: |
-          --headless --path . --import
+          & "$env:GODOT_EXE" --headless --path . --import
           if ($LASTEXITCODE -ne 0) { throw 'Project import failed' }
 
       - name: Export Windows game

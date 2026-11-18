@@ -456,3 +456,4 @@ function tick(now){requestAnimationFrame(tick);const dt=Math.min((now-prev)/1000
 function resize(){let w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}window.addEventListener('resize',resize);resize();teacher.visible=false;mates.forEach(p=>p.visible=false);taskUpdate();changeWeather('sun');placeHero();requestAnimationFrame(tick);
 $('#introStart').onclick=()=>{started=true;$('#intro').classList.remove('open');$('#musicBtn').click();notify('🖱️ Зажми левую кнопку мыши и двигай — обзор камеры')};
 </script></body></html>
+<!-- Обновление игры v0.4 -->
